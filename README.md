@@ -4,7 +4,7 @@ Uses selenium to open and update your resume to naukri.com
 can be added to a cronjob on a daily basis to increase your profile view
 
 # Installation
-`pip instal -r requirements.txt`
+`pip install -r requirements.txt`
 - download and extract geckodriver
 - create a .env file in the code folder and add the folowing details to it
 ```
