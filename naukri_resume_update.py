@@ -1,76 +1,54 @@
 from os import environ as env
 from selenium.webdriver.firefox.options import Options
-from dotenv import load_dotenv, find_dotenv
-import time
-from selenium import webdriver
-from selenium.webdriver import ActionChains
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium import webdriver
+from dotenv import load_dotenv, find_dotenv
 
 
-class AutoApplyToNaukri(object):
-    def __init__(self, geckodriver_path=""):
+class NaukriResumeUpdater:
+    def __init__(self, gecko_path, profile_path=None, headless=False, binary_path=None):
         options = Options()
-        options.headless = True
-        self.driver = webdriver.Firefox(
-            options=options, executable_path=geckodriver_path
+        if headless:
+            options.add_argument("-headless")
+        if profile_path:
+            options.add_argument("-profile")
+            options.add_argument(profile_path)
+        if binary_path:
+            options.binary_location = binary_path
+        service = Service(executable_path=gecko_path)
+        self.driver = webdriver.Firefox(service=service, options=options)
+        self.wait = WebDriverWait(self.driver, 30)
+
+    def update_resume(self, resume_path):
+        self.driver.get("https://www.naukri.com/mnjuser/profile")
+        resume_input = self.wait.until(
+            EC.presence_of_element_located((By.ID, "attachCV"))
+        )
+        resume_input.send_keys(resume_path)
+        self.wait.until(
+            lambda d: d.find_element(By.ID, "attachCVMsgBox").text.strip()
         )
 
-    def login(self, email, password):
-        try:
-            self.driver.get("https://www.naukri.com/nlogin/login")
-            time.sleep(10)
-            email_field = self.driver.find_element_by_xpath('//*[@id="usernameField"]')
-            password_field = self.driver.find_element_by_xpath(
-                '//*[@id="passwordField"]'
-            )
-            button = self.driver.find_element_by_xpath(
-                '//*[@id="loginForm"]/div[3]/div[3]/div/button[1]'
-            )
-            email_field.send_keys(email)
-            password_field.send_keys(password)
-            ActionChains(self.driver).click(button).perform()
-        except:
-            return False
-        try:
-            profile_element = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located(
-                    By.XPATH,
-                    '//*[@id="root"]/div/div/span/div/div/div/div[2]/div/div[2]/div[1]/div/a[1]',
-                )
-            )
-            return True
-        except:
-            return False
-
-    def update(self, resume_path):
-        time.sleep(10)
-        profile_page = self.driver.find_elements_by_xpath(
-            '//*[@id="root"]/div/div/span/div/div/div/div[2]/div/div[2]/div[1]/div/a[1]'
-        )[0].get_attribute("href")
-        self.driver.get(profile_page)
-        time.sleep(10)
-        resume_button = self.driver.find_element_by_xpath('//*[@id="attachCV"]')
-        resume_button.send_keys(resume_path)
-        time.sleep(10)
-        return True
-
-    def destory(self):
+    def destroy(self):
         self.driver.quit()
 
 
-def main(email, password, resume_path, gecko_path):
-    auto_apply = AutoApplyToNaukri(gecko_path)
-    auto_apply.login(email, password)
-    auto_apply.update(resume_path)
-    auto_apply.destory()
+def main(resume_path, gecko_path, profile_path=None, headless=False, binary_path=None):
+    updater = NaukriResumeUpdater(gecko_path, profile_path=profile_path, headless=headless, binary_path=binary_path)
+    try:
+        updater.update_resume(resume_path)
+    finally:
+        updater.destroy()
 
 
 if __name__ == "__main__":
     load_dotenv(find_dotenv())
-    email = env.get("EMAIL")
-    password = env.get("PASSWORD")
     resume_path = env.get("RESUME_PATH")
     gecko_path = env.get("GECKO_DRIVER_PATH")
-    main(email, password, resume_path, gecko_path)
+    profile_path = env.get("FIREFOX_PROFILE_PATH")
+    headless = env.get("HEADLESS", "false").lower() == "true"
+    binary_path = env.get("FIREFOX_BINARY_PATH")
+    main(resume_path, gecko_path, profile_path=profile_path, headless=headless, binary_path=binary_path)
