@@ -55,39 +55,39 @@ class NaukriResumeUpdater:
         self.driver.get(url)
         log.info("Current URL: %s | Title: %s", self.driver.current_url, self.driver.title)
 
-        log.info("Waiting for resume file input (#attachCV)")
+        log.info("Waiting for resume file input (#resume)")
         try:
             resume_input = self.wait.until(
-                EC.presence_of_element_located((By.ID, "attachCV"))
+                EC.presence_of_element_located((By.ID, "resume"))
             )
         except Exception:
-            log.error("Timed out waiting for #attachCV — URL: %s | Title: %s", self.driver.current_url, self.driver.title)
-            self._dump_failure("attachCV")
+            log.error("Timed out waiting for #resume — URL: %s | Title: %s", self.driver.current_url, self.driver.title)
+            self._dump_failure("resume_input")
             raise
 
-        log.info("Found #attachCV, sending resume path: %s", resume_path)
+        log.info("Found #resume, sending resume path: %s", resume_path)
         resume_input.send_keys(resume_path)
 
-        log.info("Waiting for upload confirmation (#attachCVMsgBox)")
+        # Confirmation: resume card in #profile-section-resume re-renders with
+        # an "Uploaded today" caption once the upload lands. Must use contains(., ...)
+        # not contains(text(), ...): React splits the caption into two text nodes
+        # ("Uploaded " + "today"), and text() only tests the first one.
+        confirmation_xpath = (
+            "//div[@id='profile-section-resume']"
+            "//p[contains(., 'Uploaded today')]"
+        )
+        log.info("Waiting for upload confirmation ('Uploaded today' in #profile-section-resume)")
         try:
             self.wait.until(
-                lambda d: d.find_element(By.ID, "attachCVMsgBox").text.strip()
+                EC.presence_of_element_located((By.XPATH, confirmation_xpath))
             )
         except Exception:
-            try:
-                msg_el = self.driver.find_element(By.ID, "attachCVMsgBox")
-                log.error(
-                    "Timed out waiting for #attachCVMsgBox to have text. Element found, current text: %r",
-                    msg_el.text,
-                )
-            except Exception:
-                log.error("Timed out waiting for #attachCVMsgBox — element not found at all")
+            log.error("Timed out waiting for 'Uploaded today' confirmation")
             log.error("URL at failure: %s | Title: %s", self.driver.current_url, self.driver.title)
-            self._dump_failure("attachCVMsgBox")
+            self._dump_failure("confirmation")
             raise
 
-        msg = self.driver.find_element(By.ID, "attachCVMsgBox").text.strip()
-        log.info("Upload confirmation: %r", msg)
+        log.info("Upload confirmed: resume card shows 'Uploaded today'")
 
     def destroy(self):
         log.info("Closing browser")
